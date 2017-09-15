@@ -1,0 +1,216 @@
+<html>
+<head>
+<title>jQuery Denver Breweries</title>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<script type="text/javascript">
+/*
+* Based on the requirements I received from the recruiter who contacted me about this position, 
+* I felt that making an example with a dataset that could be added to and deleted from was 
+* in line with what was expected. I did not use JQuery or any other third party libraries
+* for this assignment, but in a real life scenario, I would have as they reduce development
+* time dramatically.
+*
+* The user can add or delete breweries and sort by each row (ascending and descending). 
+* There is light form validation (on Name) to prevent empty rows from being added 
+* to the sessionStorage.
+*
+* I used the sessionStorage object because it is discarded when the browser
+* tab is closed. This example didn't need values to persist.
+*
+* This example was tested in IE 11, Chrome 46, Firefox 42 on Windows 7 and Firefox 35 on Ubuntu Linux 14.
+* This example DOES NOT work on IE 11, but it works on all other browsers it was tested in.
+* 
+* I hope whoever reviews this enjoys the subject matter. These are some of my favorite breweries
+* in Denver.
+*
+* -Chris D'Amico
+*/
+function initCap(inString){
+	//capitalize the first character and concatenate it with the rest
+	//of the string
+	return inString.charAt(0).toUpperCase() + inString.slice(1);
+}
+
+function loadBreweries(){
+	
+	
+	//tableHTML will hold all the table's HTML code. It will be inserted back into the DOM.
+	var tableHTML = "<tr><th><a href=javascript:setSort('name')>Name</a></th>" + 
+		"<th><a href=javascript:setSort('style')>Style</a></th>" +
+		"<th><a href=javascript:setSort('neighborhood')>Neighborhood</a></th>" + 
+		"<th><a href=javascript:setSort('patio')>Patio</a></th>" + 
+		"<th><a href=javascript:setSort('orderThis')>Order This</a></th><th>&nbsp</th></tr>";
+	
+	
+	var sortArray = sortBreweries(); //returns a sorted Array based on a hidden input that is changed
+									 //when a heading in the table is clicked.
+	
+	for(i=0;i<sortArray.length;i++){
+		var keyName = sortArray[i][1]; //the numeric keys were the second element in the array row.
+		tableHTML += "<tr>";
+		var valueDetail = JSON.parse(sessionStorage[keyName]); //returns an array from a JSON string.
+		for(k=0;k<valueDetail.length;k++){
+			tableHTML += "<td>" + valueDetail[k] + "</td>"; //each array item will be a cell in the table.
+		}
+		
+		tableHTML += "<td><a href=javascript:removeBrewery('" + keyName + "')>Remove</a></td></tr>";
+		
+	}
+	tableHTML += "<tr><td><input id='txtName' placeholder='Enter a Brewery' type='text'/></td><td><select id='selStyle'>" + 
+		"<option selected></option><option>American</option><option>English</option>" + 
+		"<option>German</option><option>Sour</option></select></td><td><select id='selNeighborhood'>" + 
+		"<option selected></option><option>Cherry Creek</option><option>Broadway</option>" +
+		"<option>Highlands</option><option>LoDo</option><option>RiNo</option>" + 
+		"<option>South Denver</option><option>Sunnyside</option></select></td><td>" + 
+		"<select id='txtPatio'><option selected></option><option>Yes</option>" + 
+		"<option>No</option></select></td><td><input id='txtOrderThis' type='text'/></td>" + 
+		"<td><a href=javascript:addBrewery()>Add</a></td></tr>";
+	
+        $("#tblBreweries").html(tableHTML);
+	
+}
+
+function initialLoad(){
+	if(sessionStorage.length === 0){
+		//Empty sessionStorage. Fill it with values. The items use a numeric key for ease of deletion.
+		//
+		//sessionStorage can only hold strings, so the details of each row will be turned into 
+		//one JSON string.
+		sessionStorage.setItem(0,JSON.stringify(["Trve","American","Broadway","No","Tunnel of Trees"]));
+		sessionStorage.setItem(1,JSON.stringify(["Hogshead","English","Highlands","Yes","Gilpin Black Gold"]));
+		sessionStorage.setItem(2,JSON.stringify(["Prost","German","Highlands","Yes","Pils"]));
+		sessionStorage.setItem(3,JSON.stringify(["Comrade","American","South Denver","No","Superpower IPA"]));
+		sessionStorage.setItem(4,JSON.stringify(["Bull and Bush","English","Cherry Creek","No","Man Beer"]));
+		sessionStorage.setItem(5,JSON.stringify(["Baere","American","Broadway","Yes","Saison"]));
+	}
+	loadBreweries();
+}
+function removeBrewery(name){
+	sessionStorage.removeItem(name);
+	loadBreweries(); //the page isn't reloaded, so we need to reload the list to show the change
+}
+
+function addBrewery(){
+	//check to make sure that Name is filled in to prevent blank rows being added.
+	var keyName = $("#txtName").val(); 
+	if(keyName === ''){
+		$("#valBlankName").show();
+                return;
+	}
+	else{
+		$("#valBlankName").hide();
+                var nextRow = Number($("#hidRowId").val() + 1);
+		//Javascript sorting discriminates between cases. InitCap free entry fields.
+		//
+		//sessionStorage can only store key/value pairs. Use Stringify to create a
+		//string object that contains all the values from the row.
+		sessionStorage.setItem(nextRow,
+			JSON.stringify([initCap(keyName), 
+				$("#selStyle").val(),
+				$("#selNeighborhood").val(),
+				$("#txtPatio").val(),
+				initCap($("#txtOrderThis").val())]));
+		$("#hidRowId").val(nextRow);
+		setSort('name'); //have the list sort by name on the next load
+		loadBreweries(); //the page isn't reloaded, so we need to reload the list to show the add.
+	}
+}
+
+function setSort(name){
+//Check the hidden values to see what needs to be sorted. If the same
+//sort button was clicked, flip the sort.
+	if($("#hidSortField").val() === name){
+		if( $("#hidSortOrder").val() === 'asc'){
+			$("#hidSortOrder").val("desc");
+		}
+		else{
+			$("#hidSortOrder").val("asc");
+		}
+	};
+	
+	$("#hidSortField").val(name);
+	loadBreweries(); //the page isn't reloaded, so we need to reload the list to show the sorting.
+}
+
+function sortBreweries(){
+	//since sessionState doesn't provide sorting, we had to make an array-based sorting function.
+	var name = $("#hidSortField").val();
+	var arraySort = [];
+	var sortOnField = 0;
+	switch(name){ //each name corresponds to a position in the array, get the array position
+		case "name":
+			sortOnField = 0;
+		break;
+		case "style":
+			sortOnField = 1;
+		break;
+		case "neighborhood":
+			sortOnField = 2;
+		break;
+		case "patio":
+			sortOnField = 3;
+		break;
+		case "orderThis":
+			sortOnField = 4;
+		break;
+		default:
+		break;
+	}
+	
+	//put each value to be sorted and its ID into an array for sorting
+	for(i=0;i<sessionStorage.length;i++){ 
+		var keyName = sessionStorage.key(i);
+		var valueDetail = JSON.parse(sessionStorage[keyName]);
+		arraySort.push([valueDetail[sortOnField],keyName]);
+	}	
+	arraySort.sort();
+	if($("#hidSortOrder").val() === 'desc'){
+		arraySort.reverse();
+	}
+	return arraySort;
+}
+</script>
+<style>
+td,th{
+	background-color: #88CD88;
+	text-align: left;
+	border: 1px solid black;
+	padding: 4px;
+	font-size: 14px;
+}
+
+table {
+	width: 100%;
+	border: 1px solid black;
+	border-collapse: collapse;
+}
+
+a:link{
+	color: #116611;
+}
+
+h1{
+	font-size: 18px; 
+}
+
+#divTable{
+	font-family: Arial, Helvetica, sans-serif;
+	width: 550px;
+}
+</style>
+</head>
+<body onload="initialLoad()">
+	<h1>Denver Breweries</h1>
+	<form id="frmBreweries">
+		<input id="hidSortField" type="hidden" value="name"/>
+		<input id="hidSortOrder" type="hidden" value="asc"/>
+		<input id="hidRowId" type="hidden" value="5"/>
+		<div id="divTable">
+			<table id="tblBreweries"></table>
+			<div id="valBlankName" style="visibility:hidden">
+				<p style="color:red">* Please enter a brewery name.</p>
+			</div>
+		</div>
+	</form>
+</body>
+</html>
